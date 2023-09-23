@@ -3,7 +3,7 @@ Descripttion:
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-09-19 23:56:25
+LastEditTime: 2023-09-24 03:36:37
 '''
 import os
 import random
@@ -20,8 +20,9 @@ import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader, ConcatDataset, random_split
 
 from config.cfg import Config
-from dataset.dataset import MultiDevice, SingleDevice
-from model import Model,Basemodel
+# from dataset.dataset import MultiDevice, SingleDevice
+from dataset.ap import SingleDevice_AP
+from model import Basemodel
 from utils.logger import Log
 from utils.meter import AverageMeter
 from utils.gradualwarmup import GradualWarmupScheduler
@@ -89,9 +90,9 @@ data_dir = [
             ['/server19/lmj/github/wifi_localization/data/room3',gt_dir]]
 for file in data_files:
     for dirname in data_dir:
-        dataset_list.append(SingleDevice(data_file=os.path.join(dirname[0],file),
+        dataset_list.append(SingleDevice_AP(data_file=os.path.join(dirname[0],file),
                                          gt_file = os.path.join(dirname[1],file) if dirname[1] else dirname[1],
-                                         window_size=2,stride=2))
+                                         window_size=2,stride=2,n_sample=100,buf=10))
 
 
 full_dataset = ConcatDataset(dataset_list)
@@ -122,7 +123,7 @@ test_loader = DataLoader(test_data,
 loss = torch.nn.CrossEntropyLoss()
 
 device = torch.device('cuda',local_rank)
-model = Basemodel().to(device)
+model = Basemodel(T=100).to(device)
 model=torch.nn.parallel.DistributedDataParallel(model,device_ids=[local_rank],find_unused_parameters =True,output_device=local_rank)
 
 filtered_parameters = []
@@ -149,14 +150,14 @@ def val(model,loss):
         val_loss_counter.reset()
         with tqdm(total=len(test_loader),desc='val',ncols=100) as valbar:
             for batch_idx,data in enumerate(test_loader):
-                timestamp,rx,gt = data
-                rx = rx.to(torch.float32).cuda()
-                gt = gt.to(torch.float32).cuda()
+                timestamp,csi,gt = data
+                csi = csi.cuda()
+                gt = gt.cuda()
                 
                 batchsize = gt.size()[0]
                 n_sample+=batchsize
                 
-                preds = model(rx)
+                preds = model(csi)
                 # print(preds,gt)
                 cost = loss(preds,gt.long())
                 val_loss_counter.update(cost.item())
@@ -179,13 +180,14 @@ print('start training...')
 train_loss_counter = AverageMeter('Loss', ':.4e')
 for epoch in range(config['epoch']):
     train_loss_counter.reset()
+    model.train()
     with tqdm(total=len(train_loader),desc='epoch:{0}/{1}'.format(epoch+1, config['epoch']),ncols=100) as trainbar:
         for batch_idx,data in enumerate(train_loader):
-            timestamp,rx,gt = data
-            rx = rx.to(torch.float32).cuda()
-            gt = gt.to(torch.float32).cuda()
-            print(gt)
-            preds = model(rx)
+            timestamp,csi,gt = data
+            csi = csi.cuda()
+            gt = gt.cuda()
+            # print(gt)
+            preds = model(csi)
             cost = loss(preds,gt.long())
             optimizer.zero_grad()
             cost.backward()
@@ -197,7 +199,6 @@ for epoch in range(config['epoch']):
             
     print('[epoch:{0}/{1}] Loss:{2}'.format(epoch+1,config['epoch'],train_loss_counter))
     val_loss,score=val(model,loss)
-    model.train()
     if local_rank==0:
         logger.print([[str(epoch+1),str(optimizer.param_groups[0]['lr']),str(train_loss_counter),str(val_loss),str(score),str(best_score)]])
         torch.save(model.state_dict(), os.path.join(config['model_save_dir'],config['model_name'],'lastest.pth'))

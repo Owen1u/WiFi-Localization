@@ -3,7 +3,7 @@ Descripttion:
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-09-20 19:28:05
+LastEditTime: 2023-09-24 02:16:30
 '''
 import torch
 from torch import nn as nn
@@ -60,99 +60,70 @@ class BidirectionalGRU(nn.Module):
         recurrent, _ = self.rnn(input)  # batch_size x T x input_size -> batch_size x T x (2*hidden_size)
         output = self.linear(recurrent)  # batch_size x T x output_size
         return output
-
-class Model(nn.Module):
-    def __init__(self) -> None:
-        ROOM=3
-        T=25
-        L=4
-        V=2
-        C=64
-        super().__init__()
-        self.cross_attn = nn.MultiheadAttention(embed_dim=L*C,num_heads=4,batch_first=True)
-        self.self_attn = nn.MultiheadAttention(embed_dim=L*C,num_heads=4,batch_first=True)
-        # self.rearrange = Rearrange('b p1 p2 t c -> b (p1 p2) t c', p1 = 3, p2 = 4)
-        self.rnn = BidirectionalLSTM(input_size=2*ROOM*L*V*C,hidden_size=2*ROOM*L*V*C,output_size=ROOM*L*V*C)
-        # self.adaptiveavgpool1 = nn.AdaptiveAvgPool2d((None, 1))
-        self.adaptiveavgpool2 = nn.AdaptiveAvgPool2d((1, None))
-        self.mlp = Mlp(in_features=L*C,hidden_features=L*C,out_features=C)
-        self.cls= Mlp(in_features=C,hidden_features=2*C,out_features=4)
-        self.bn = nn.BatchNorm1d(num_features=C)
-        self.ln = nn.LayerNorm([ROOM,L*C])
-        self.cnn = nn.Conv1d(in_channels=ROOM*L*V*C,out_channels=2*ROOM*L*V*C,padding=1,stride=1,kernel_size=3)
-        self.bn2 = nn.BatchNorm1d(num_features=2*ROOM*L*V*C)
-        
-    def forward(self,input:torch.Tensor):
-        N,ROOM,T,L,v,C = input.size()
-        x = input.permute(0,2,1,3,4,5).reshape(N,T,-1)
-        
-        x = self.bn2(self.cnn(x.permute(0,2,1))).permute(0,2,1)
-        
-        x = self.rnn(x)
-        x = self.adaptiveavgpool2(x).squeeze(1)
-        x = x.reshape(N,ROOM,L,v,C)
-        
-        real = x[:,:,:,0,:].reshape(N,ROOM,-1)
-        imag = x[:,:,:,1,:].reshape(N,ROOM,-1)
-        y,_ = self.cross_attn(query=real, key=imag, value=imag)
-        y = self.ln(y)
-        y,_ = self.self_attn(query=y, key=y, value=y)
-        # [N,ROOM,L*C]
-        
-        z = self.mlp(y)
-        z = self.bn(z.permute(0,2,1)).permute(0,2,1)
-        z = self.adaptiveavgpool2(z).squeeze(1)
-        z = self.cls(z)
-
-        return z.log_softmax(1)
         
 class Basemodel(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self,T,V=2,C=64,L=4) -> None:
         super().__init__()
-        self.relu   = nn.GELU()
-        self.bn = nn.BatchNorm1d(num_features=512)
-        self.fc1 = nn.Linear(512,1024)
-        self.ln1 = nn.LayerNorm([1024])
-        self.fc2  = nn.Linear(1024,2048)
-        self.ln2 = nn.LayerNorm([2048])
-        self.fc3  = nn.Linear(2048,512)
-        self.ln3 = nn.LayerNorm([512])
-        self.fc_out = nn.Linear(512,4)
-
-        self.dropout = nn.Dropout(0.05)
+        kernel_size = 10
+        stride=5
+        self.cnn = nn.Conv1d(in_channels=V*C*L,out_channels=2*C*L,kernel_size=kernel_size,stride=stride)
+        self.bn0 = nn.BatchNorm1d(num_features=2*C*L)
+        self.pool0 = nn.Linear((T-kernel_size)//stride+1,1)
         
-        # self.pool = nn.AvgPool1d(25,stride=25)
-        self.pool = nn.Linear(25,1)
-        self.insnorm = nn.InstanceNorm1d(25,affine=True)
-        self.rnn = BidirectionalGRU(input_size=4*2*64,hidden_size=2*4*2*64,output_size=4*2*64)
+        self.rnn = BidirectionalGRU(input_size=2*V*C*L,hidden_size=4*V*C*L,output_size=2*V*C*L)
+        self.self_attn = nn.MultiheadAttention(embed_dim=V*C*L,num_heads=4,batch_first=True)
+        self.pool1 = nn.Linear(T,1)
+        
+        self.relu   = nn.GELU()
+        
+        self.fc1 = nn.Linear(V*C*L,2*V*C*L)
+        self.bn1 = nn.BatchNorm1d(num_features=2*V*C*L)
+        self.ln1 = nn.LayerNorm([2*V*C*L])
+        self.fc2  = nn.Linear(2*C*L,4*C*L)
+        self.bn2 = nn.BatchNorm1d(num_features=4*C*L)
+        self.fc3  = nn.Linear(4*C*L,1*C*L)
+        self.bn3 = nn.BatchNorm1d(num_features=1*C*L)
+        self.fc_out = nn.Linear(C*L,5)
+        
+        self.cross_attn = nn.MultiheadAttention(embed_dim=2*L*C,num_heads=4,batch_first=True)
+        self.self_attn = nn.MultiheadAttention(embed_dim=2*L*C,num_heads=4,batch_first=True)
         
         self.apply(self.weight_init)
         
-    def forward(self,x:torch.Tensor):
-        N,T,L,C,V = x.size()
-        x = x.reshape(N,T,-1)
-        # x = self.insnorm(x)
-        # print(x[0,0])
-        # x = self.rnn(x)
-        # x = self.pool(x.permute(0,2,1)).squeeze(-1)
-        x = self.pool(x.permute(0,2,1)).squeeze(-1)
-        x = self.bn(x)
-        x = self.fc1(x)
-        x = self.ln1(x)
+    def forward(self,input:torch.Tensor):
+        N,T,V,C = input.size()
+        input = input.reshape(N,T,-1)
+        input_ = self.bn0(self.cnn(input.permute(0,2,1)))
+        input_ = self.relu(input_)
+        input_ = self.pool0(input_).squeeze(-1)
+
+        # N,T,V*C
+        x = self.fc1(input)
+        x = self.bn1(x.permute(0,2,1)).permute(0,2,1)
         x = self.relu(x)
+
+        # N,T,2*V*C
+        x = self.rnn(x)
+        # N,T,2*V*C
+        x = x.reshape(N,T,V,2*C)
+        amplitude = x[:,:,0,:]
+        phase = x[:,:,1,:]
+        # N,T,2*C
+        y,_ = self.cross_attn(query=amplitude,key=phase,value=phase)
+        y = self.relu(y)
+        y,_ = self.self_attn(query=y,key=y,value=y)
+        y = self.pool1(y.permute(0,2,1)).squeeze(-1)
+        y = self.relu(y)
+        # N,2*C
+        y = self.fc2(y+input_)
+        y = self.bn2(y)
+        y = self.relu(y)
         
-        x = self.fc2(x)
-        # x = self.ln2(x)
-        x = self.relu(x)
+        z = self.fc3(y)
+        z = self.bn3(z)
+        z = self.relu(z)
         
-        x = self.fc3(x)
-        # x = self.ln3(x)
-        x = self.relu(x)
-        
-        x = self.fc_out(x)
-        print(x)
-        
-        return x.softmax(dim=1)
+        return self.fc_out(z).softmax(dim=1)
     
     def weight_init(self,m):
         if isinstance(m, nn.Linear):
