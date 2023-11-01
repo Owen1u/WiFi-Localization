@@ -3,7 +3,7 @@ Descripttion: Resnet1d + RNN + MLP
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-10-31 22:06:22
+LastEditTime: 2023-11-01 23:07:25
 '''
 import math
 import torch
@@ -128,7 +128,7 @@ class Model(nn.Module):
         # x = x.reshape(0,2,1)
         x = self.resnet1d(x)
         x = self.rnn(x)
-        manned = self.mlp1(x).log_softmax(2).permute(0,2,1)
+        manned = torch.softmax(self.mlp1(x), dim=2).permute(0,2,1)
         num_human = self.mlp2(x).squeeze(-1)
         return manned,num_human
         

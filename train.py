@@ -3,7 +3,7 @@ Descripttion:
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-11-01 19:00:54
+LastEditTime: 2023-11-02 04:41:38
 '''
 '''
 Descripttion: 
@@ -29,8 +29,6 @@ from torch.utils.data import DataLoader, ConcatDataset, random_split
 from torch.autograd import Variable
 
 from config.cfg import Config
-# from dataset.dataset import MultiDevice, SingleDevice
-from dataset.ap import SingleDevice_AP
 from dataset.wifi import WiFi,MultiWiFi
 from model.model import Basemodel
 from model.net import Model
@@ -72,30 +70,23 @@ else:
 set_seed(config['seed'])
 
 dataset_list = []
-for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1016/train/gt','*.txt')):
+for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1020/train/gt','*.txt')):
     data_file = gt_file.replace('gt','signal')
     dataset_list.append(WiFi(data_file=data_file,
                                 gt_file=gt_file,
                                 stride=config['stride'],
                                 window_size=config['window_size']))
+# for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1020/train/gt','*.txt')):
+#     data_file = gt_file.replace('gt','signal')
+#     dataset_list.append(WiFi(data_file=data_file,
+#                                 gt_file=gt_file,
+#                                 stride=config['stride'],
+#                                 window_size=config['window_size']))
     
 train_data = ConcatDataset(dataset_list)
 
-# dataset_list = []
-# data_files=[
-#             ['csi_2023_09_09_16_02.txt',[0,64]],
-#             ['csi_2023_09_09_20_55.txt',[0,64]],
-#             ]
-# gt_dir = '/server19/lmj/github/wifi_localization/data/room3-gt'
-# data_dir = [['/server19/lmj/github/wifi_localization/data/room3',gt_dir]]
-# for file in data_files:
-#     for dirname in data_dir:
-#         dataset_list.append(WiFi(data_file=os.path.join(dirname[0],file[0]),
-#                                  gt_file=os.path.join(dirname[1],file[0]),
-#                                  stride=2,
-#                                  phase_diff=file[1]))
 dataset_list = []
-for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1016/train/gt','*.txt')):
+for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1020/train/gt','*.txt')):
     data_file = gt_file.replace('gt','signal')
     dataset_list.append(WiFi(data_file=data_file,
                                 gt_file=gt_file,
@@ -120,7 +111,7 @@ train_loader = DataLoader(train_data,
                           )
 
 test_loader = DataLoader(test_data,
-                         batch_size=1,
+                         batch_size=8,
                          num_workers=1,
                          pin_memory=True,
                          sampler=test_sampler

@@ -24,9 +24,10 @@ from utils.logger import Log
 from utils.meter import AverageMeter
 from utils.gradualwarmup import GradualWarmupScheduler
 
-answer = open('/server19/lmj/github/wifi_localization/predict/office.txt','w')
-TASK = 'task1'
-M=8+1
+answer = open('/server19/lmj/github/wifi_localization/predict/2_officeB.txt','w')
+TASK = 'task2'
+M=6+1
+Threshold = 0.8
 
 def set_seed(seed):
     random.seed(seed)
@@ -35,10 +36,10 @@ def set_seed(seed):
     
 cfg = Config('/server19/lmj/github/wifi_localization/config/config.yaml')
 config = cfg()
-config['model_name']='/server19/lmj/github/wifi_localization/run/v2.0'
+config['model_name']='/server19/lmj/github/wifi_localization/run/v3.2'
 set_seed(config['seed'])
 
-device = torch.device('cuda',7)
+device = torch.device('cuda',0)
 model = Model().to(device)
 
 new_state_dict = OrderedDict()
@@ -55,37 +56,20 @@ model.load_state_dict(new_state_dict)
 print('loading pre-trained model from {0}'.format(os.path.join(config['model_save_dir'],config['model_name'],'best.pth')))
 
 dataset_list = []
-# data_files=[
-#             # ['csi_2023_09_09_16_02.txt',64],
-#             ['csi_2023_09_09_20_55.txt',64],
-#             # ['csi_2023_09_11_15_14.txt',128],
-#             ]
-# gt_dir = '/server19/lmj/github/wifi_localization/data/room3-gt'
-# data_dir = [['/server19/lmj/github/wifi_localization/data/room3',gt_dir]]
-# for file in data_files:
-#     for dirname in data_dir:
-#         dataset_list.append(WiFi(data_file=os.path.join(dirname[0],file[0]),
-#                                  gt_file=os.path.join(dirname[1],file[0]),
-#                                  stride=2,
-#                                  ))
 for room in range(0,4):
     for i in range(1,M):
         file_name = os.path.join('/server19/lmj/github/wifi_localization/data/test',TASK,'room'+str(room),'data','csi_2023_10_31_'+str(i)+'.txt')
         print(file_name)
-#      dataset_list.append(WiFi(data_file=file_name,
-#                                  stride=2,
-#                                  window_size=72))
-    # test_data = ConcatDataset(dataset_list)
+
         test_data = WiFi(data_file=file_name,
                                     stride=2,
-                                    window_size=72)
+                                    window_size=config['window_size'])
 
         test_loader = DataLoader(test_data,
                                 batch_size=1,
                                 num_workers=1,
                                 pin_memory=True,
                                 )
-        fig, ax = plt.subplots(figsize=(18,6), facecolor='white')
         with torch.no_grad():
             count = np.zeros([300*4])
             score_man = np.zeros([300*4])
@@ -99,10 +83,12 @@ for room in range(0,4):
                     preds_manned, preds_numhuman = model(csi)
                     start = timestamp[0].item()
                     end = timestamp[1].item()
-                    # x = np.linspace(start, end, gt_manned.size(1))
-                    # ax.plot(x, gt_manned.cpu().numpy()[0], color='r',linestyle='-')
-                    # print(start,end,preds)
-                    _,preds_manned = preds_manned.max(1)
+
+                    
+                    # _,preds_manned = preds_manned.max(1)
+                    x = preds_manned[:,0,:].cpu().numpy()
+                    y = preds_manned[:,1,:].cpu().numpy()
+                    preds_manned  = torch.from_numpy(np.select(y>=Threshold,np.ones_like(y),np.zeros_like(y)))
                     for pred_man,pred_num in zip(preds_manned,preds_numhuman):
                         _count = np.zeros_like(count)
                         _count[start*4:end*4]=1
@@ -116,27 +102,16 @@ for room in range(0,4):
                         _score[start*4:end*4]=pred_num.cpu().numpy()
                         score_num+=_score
                     
-                    
-                    valbar.update(1)
-                    
+                    valbar.update(1)  
 
             predict_man = score_man / count
             predict_man = [round(i) for i in predict_man]
-            predict_man = [round(np.mean(np.array(predict_man[i:i+4]))) for i in range(0,len(predict_man),4)]
+            predict_man = [round(np.mean(np.array(predict_man[i:i+8]))) for i in range(0,len(predict_man),8)]
             predict_man = signal.medfilt(predict_man,5)
-            x = np.linspace(0, 300, len(predict_man))
-            ax.plot(x, predict_man, color='b',linestyle='-',label='predict_man')
             
             predict_num = score_num / count
             predict_num = [round(i) for i in predict_num]
-            predict_num = [round(np.mean(np.array(predict_num[i:i+4]))) for i in range(0,len(predict_num),4)]
-            
-            # x = np.linspace(0, 300, len(predict_num))
-            # ax.plot(x, predict_num, color='b',linestyle='-',label='predict_num')
-            # plt.xlabel('Time')
-            # plt.ylabel('Value')
-            # fig.legend(loc='upper right')
-            # fig.savefig('predict.jpg')
+            predict_num = [round(np.mean(np.array(predict_num[i:i+8]))) for i in range(0,len(predict_num),8)]
 
             for i in range(len(predict_man)):
                 if predict_man[i]==1 and predict_num[i]>=1:
@@ -146,9 +121,3 @@ for room in range(0,4):
             predict_man = ' '.join(predict_man)
             answer.write(predict_man+'\n')
             
-            # print(predict_num)
-            # predict_num = [str(p) for p in predict_num]
-            # predict_num = ' '.join(predict_num)
-                    
-                
-                

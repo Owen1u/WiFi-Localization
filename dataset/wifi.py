@@ -3,7 +3,7 @@ Descripttion:
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-11-01 18:59:23
+LastEditTime: 2023-11-01 20:09:30
 '''
 import os
 import pywt
@@ -49,7 +49,8 @@ class Frame():
             self.phase = cmath.phase(rx)
         
 class WiFi(Dataset):
-    def __init__(self,data_file,gt_file=None,sampling_f=96,duration=300,buf=8,window_size=72,stride=1,phase_diff=[0,64],plotting=False) -> None:
+    def __init__(self,data_file,gt_file=None,sampling_f=96,duration=300,buf=8,
+                 window_size=72,stride=1,phase_diff=[0,64],plotting=False) -> None:
         super().__init__()
         
         self.sampling_f = sampling_f
