@@ -9,15 +9,10 @@
 ### Model
 ```mermaid
 graph TD;
-    Resnet1d --> Bi-LSTM;
-    Bi-LSTM --> MLP1;
-    Bi-LSTM --> MLP2;
-    MLP1 --> BCE_Loss;
-    MLP2 --> MSE_Loss;
-    BCE_Loss --> 二分类是否有人;
-    MSE_Loss --> 人数预测;
-    二分类是否有人 --预测 0/1，判1的阈值为0.8--> 最终输出;
-    人数预测 --对有人场景预测人数--> 最终输出;
+    A-->B;
+    A-->C;
+    B-->D;
+    C-->D;
 ```
 
 ### Result
