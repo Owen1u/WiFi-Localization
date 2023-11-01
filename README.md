@@ -9,10 +9,15 @@
 ### Model
 ```mermaid
 graph TD;
-    A-->B;
-    A-->C;
-    B-->D;
-    C-->D;
+    Resnet1d --> Bi-LSTM;
+    Bi-LSTM --> MLP1;
+    Bi-LSTM --> MLP2;
+    MLP1 --> BCE_Loss;
+    MLP2 --> MSE_Loss;
+    BCE_Loss -.-> A(predict 0/1);
+    MSE_Loss -.-> B(predict number of person);
+    A --> Output;
+    B --> Output;
 ```
 
 ### Result
