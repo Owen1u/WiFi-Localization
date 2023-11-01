@@ -1,10 +1,13 @@
-model_name: v0.1
+model_name: v2.0
 model_save_dir: /server19/lmj/github/wifi_localization/run
 seed: 2023
 
-epoch: 30
-lr_f: 0.0001
+epoch: 50
+lr_f: 0.001
 lr_min: 0.00001
-multiplier: 3
-warmup_epoch: 5
+multiplier: 1
+warmup_epoch: 1
 grad_clip: 5
+
+window_size: 80
+stride: 1
