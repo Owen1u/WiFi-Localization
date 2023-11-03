@@ -3,7 +3,7 @@ Descripttion: Resnet1d + RNN + MLP
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-11-01 23:07:25
+LastEditTime: 2023-11-02 22:50:18
 '''
 import math
 import torch
@@ -115,7 +115,7 @@ class Model(nn.Module):
     def __init__(self,*args,**kw) -> None:
         super().__init__()
         
-        self.resnet1d = Resnet1d(in_channels=16,out_channels=256)
+        self.resnet1d = Resnet1d(in_channels=8,out_channels=256)
         self.rnn = nn.Sequential(
             BidirectionalLSTM(input_size=256,hidden_size=512,output_size=512,bidirectional=True),
             BidirectionalLSTM(input_size=512,hidden_size=512,output_size=256,bidirectional=True)

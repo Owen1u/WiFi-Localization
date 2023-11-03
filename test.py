@@ -24,9 +24,9 @@ from utils.logger import Log
 from utils.meter import AverageMeter
 from utils.gradualwarmup import GradualWarmupScheduler
 
-answer = open('/server19/lmj/github/wifi_localization/predict/2_officeB.txt','w')
-TASK = 'task2'
-M=6+1
+answer = open('/server19/lmj/github/wifi_localization/predict/1_officeA.txt','w')
+TASK = 'task1'
+M=8+1
 Threshold = 0.8
 
 def set_seed(seed):
@@ -36,7 +36,7 @@ def set_seed(seed):
     
 cfg = Config('/server19/lmj/github/wifi_localization/config/config.yaml')
 config = cfg()
-config['model_name']='/server19/lmj/github/wifi_localization/run/v3.2'
+config['model_name']='/server19/lmj/github/wifi_localization/run/v3.5'
 set_seed(config['seed'])
 
 device = torch.device('cuda',0)

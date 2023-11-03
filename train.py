@@ -3,7 +3,7 @@ Descripttion:
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-11-02 04:41:38
+LastEditTime: 2023-11-03 00:26:05
 '''
 '''
 Descripttion: 
@@ -70,13 +70,13 @@ else:
 set_seed(config['seed'])
 
 dataset_list = []
-for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1020/train/gt','*.txt')):
+for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1016/train/gt','*.txt')):
     data_file = gt_file.replace('gt','signal')
     dataset_list.append(WiFi(data_file=data_file,
                                 gt_file=gt_file,
                                 stride=config['stride'],
                                 window_size=config['window_size']))
-# for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1020/train/gt','*.txt')):
+# for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/0909/gt','*.txt')):
 #     data_file = gt_file.replace('gt','signal')
 #     dataset_list.append(WiFi(data_file=data_file,
 #                                 gt_file=gt_file,
@@ -86,7 +86,7 @@ for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/da
 train_data = ConcatDataset(dataset_list)
 
 dataset_list = []
-for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1020/train/gt','*.txt')):
+for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1016/train/gt','*.txt')):
     data_file = gt_file.replace('gt','signal')
     dataset_list.append(WiFi(data_file=data_file,
                                 gt_file=gt_file,
@@ -103,7 +103,7 @@ train_sampler = torch.utils.data.distributed.DistributedSampler(train_data,shuff
 test_sampler = torch.utils.data.distributed.DistributedSampler(test_data,shuffle=False)
 
 train_loader = DataLoader(train_data,
-                          batch_size=8,
+                          batch_size=16,
                           num_workers=1,
                           pin_memory=True,
                         #   drop_last = True,
@@ -111,7 +111,7 @@ train_loader = DataLoader(train_data,
                           )
 
 test_loader = DataLoader(test_data,
-                         batch_size=8,
+                         batch_size=16,
                          num_workers=1,
                          pin_memory=True,
                          sampler=test_sampler
