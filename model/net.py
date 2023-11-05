@@ -3,7 +3,7 @@ Descripttion: Resnet1d + RNN + MLP
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-11-02 22:50:18
+LastEditTime: 2023-11-05 00:40:27
 '''
 import math
 import torch

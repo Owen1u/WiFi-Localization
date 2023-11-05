@@ -3,7 +3,7 @@ Descripttion:
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-11-03 00:26:05
+LastEditTime: 2023-11-05 00:44:49
 '''
 '''
 Descripttion: 
@@ -82,7 +82,7 @@ for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/da
 #                                 gt_file=gt_file,
 #                                 stride=config['stride'],
 #                                 window_size=config['window_size']))
-    
+
 train_data = ConcatDataset(dataset_list)
 
 dataset_list = []

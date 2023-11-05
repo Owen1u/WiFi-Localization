@@ -24,10 +24,11 @@ from utils.logger import Log
 from utils.meter import AverageMeter
 from utils.gradualwarmup import GradualWarmupScheduler
 
-answer = open('/server19/lmj/github/wifi_localization/predict/1_officeA.txt','w')
+answer = open('/server19/lmj/github/wifi_localization/predict/1_office_412.txt','w')
 TASK = 'task1'
 M=8+1
 Threshold = 0.8
+R=2
 
 def set_seed(seed):
     random.seed(seed)
@@ -36,7 +37,7 @@ def set_seed(seed):
     
 cfg = Config('/server19/lmj/github/wifi_localization/config/config.yaml')
 config = cfg()
-config['model_name']='/server19/lmj/github/wifi_localization/run/v3.5'
+config['model_name']='/server19/lmj/github/wifi_localization/run/v4.1'
 set_seed(config['seed'])
 
 device = torch.device('cuda',0)
@@ -71,9 +72,9 @@ for room in range(0,4):
                                 pin_memory=True,
                                 )
         with torch.no_grad():
-            count = np.zeros([300*4])
-            score_man = np.zeros([300*4])
-            score_num = np.zeros([300*4])
+            count = np.zeros([300*R])
+            score_man = np.zeros([300*R])
+            score_num = np.zeros([300*R])
             model.eval()
             with tqdm(total=len(test_loader),desc='test',ncols=100) as valbar:
                 for batch_idx,data in enumerate(test_loader):
@@ -91,31 +92,33 @@ for room in range(0,4):
                     preds_manned  = torch.from_numpy(np.select(y>=Threshold,np.ones_like(y),np.zeros_like(y)))
                     for pred_man,pred_num in zip(preds_manned,preds_numhuman):
                         _count = np.zeros_like(count)
-                        _count[start*4:end*4]=1
+                        _count[start*R:end*R]=1
                         count = count+_count
                         
                         _score = np.zeros_like(score_man)
-                        _score[start*4:end*4]=pred_man.cpu().numpy()
+                        _score[start*R:end*R]=pred_man.cpu().numpy()
                         score_man+=_score
                         
                         _score = np.zeros_like(score_num)
-                        _score[start*4:end*4]=pred_num.cpu().numpy()
+                        _score[start*R:end*R]=pred_num.cpu().numpy()
                         score_num+=_score
                     
                     valbar.update(1)  
 
             predict_man = score_man / count
             predict_man = [round(i) for i in predict_man]
-            predict_man = [round(np.mean(np.array(predict_man[i:i+8]))) for i in range(0,len(predict_man),8)]
+            predict_man = [round(np.mean(np.array(predict_man[i:i+R*2]))) for i in range(0,len(predict_man),R*2)]
             predict_man = signal.medfilt(predict_man,5)
             
             predict_num = score_num / count
             predict_num = [round(i) for i in predict_num]
-            predict_num = [round(np.mean(np.array(predict_num[i:i+8]))) for i in range(0,len(predict_num),8)]
+            predict_num = [round(np.mean(np.array(predict_num[i:i+R*2]))) for i in range(0,len(predict_num),R*2)]
 
             for i in range(len(predict_man)):
                 if predict_man[i]==1 and predict_num[i]>=1:
                     predict_man[i] = predict_num[i]
+            if 0 not in predict_man:
+                predict_man -= 1
             print(predict_man)
             predict_man = [str(p) for p in predict_man]
             predict_man = ' '.join(predict_man)

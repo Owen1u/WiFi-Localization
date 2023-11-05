@@ -3,7 +3,7 @@ Descripttion:
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-11-03 00:24:58
+LastEditTime: 2023-11-05 16:22:55
 '''
 import os
 import pywt
@@ -49,8 +49,10 @@ class Frame():
             self.phase = cmath.phase(rx)
         
 class WiFi(Dataset):
-    def __init__(self,data_file,gt_file=None,sampling_f=96,duration=300,buf=8,
-                 window_size=72,stride=1,phase_diff=[0,64],plotting=False) -> None:
+    def __init__(self,data_file,gt_file=None,sampling_f=48,duration=300,buf=8,
+                 window_size=72,stride=1,phase_diff=[0,64],plotting=False,
+                 _time=3,_rssi=4,_mcs=1,_gain=4,_H=64,_num_H=4,
+                 subcarrier=(24,32)) -> None:
         super().__init__()
         
         self.sampling_f = sampling_f
@@ -66,15 +68,15 @@ class WiFi(Dataset):
         with open(data_file,'r') as file:
             for sample in file.readlines():
                 sample_list = sample.strip().split()
-                for sample_ele in range(0,len(sample_list),12+256):
+                for sample_ele in range(0,len(sample_list),sum([_time,_rssi,_mcs,_gain,_H*_num_H])):
                     # fp.write(' '.join(sample_list[sample_ele:sample_ele+12+256])+'\n')
                     # print(sample_list[sample_ele+12:sample_ele+12+256])
-                    timestamp = np.array(sample_list[sample_ele:sample_ele+3],dtype=np.float32)
-                    timestamp = 360 * timestamp[0] + 60 * timestamp[1] + timestamp[2]
-                    rssi = np.array(sample_list[sample_ele+3:sample_ele+7],dtype=np.float32)
-                    mcs = np.array(sample_list[sample_ele+7],dtype=np.float32)
-                    gain = np.array(sample_list[sample_ele+8:sample_ele+12],dtype=np.float32)
-                    rx = [i.replace('i','j') for i in sample_list[sample_ele+12:sample_ele+12+256]]
+                    timestamp = np.array(sample_list[sample_ele:sample_ele+sum([_time])],dtype=np.float32)
+                    timestamp = 3600 * timestamp[0] + 60 * timestamp[1] + timestamp[2]
+                    rssi = np.array(sample_list[sample_ele+sum([_time]):sample_ele+sum([_time,_rssi])],dtype=np.float32)
+                    mcs = np.array(sample_list[sample_ele+sum([_time,_rssi]):sample_ele+sum([_time,_rssi,_mcs])],dtype=np.float32)
+                    gain = np.array(sample_list[sample_ele+sum([_time,_rssi,_mcs]):sample_ele+sum([_time,_rssi,_mcs,_gain])],dtype=np.float32)
+                    rx = [i.replace('i','j') for i in sample_list[sample_ele+sum([_time,_rssi,_mcs,_gain]):sample_ele+sum([_time,_rssi,_mcs,_gain,_H*_num_H])]]
                     rx = np.array(rx,dtype=np.complex128)
                     self.data.append(Frame(timestamp,rx,rssi,mcs,gain))
             file.close()
@@ -94,11 +96,9 @@ class WiFi(Dataset):
 
         self.phases = None
         phases = []
-        for k in range(24,32,1):
+        for k in range(subcarrier[0],subcarrier[1],1):
             phase = np.array([i.phase[k+phase_diff[0]]-i.phase[k+phase_diff[1]] for i in self.data])
-            # phase = self.filt([i.phase[k]-i.phase[k+phase_diff] for i in self.data])
             _phase=[]
-            # phase[0]=np.mean(phase[0:100])
             for i in range(0,len(phase)):
                 if phase[i] >np.pi:
                     while phase[i]>np.pi:
@@ -116,7 +116,6 @@ class WiFi(Dataset):
                     # phase[i] = phase[i-1]
                 _phase.append(phase[i])
             phase = np.array(_phase)
-            
             
             phase = self.hampel(phase,11)
             # phase = signal.savgol_filter(phase,7,3)
@@ -137,6 +136,9 @@ class WiFi(Dataset):
         #         declines.append(self.data[0].decline)
         # self.declines = np.array(declines)
         # self.declines = self.hampel(self.declines,3)
+        # timestamps,self.declines  = self.sampling([i.timestamp for i in self.data],self.declines,sampling_f,duration)
+        # self.declines = self.declines-np.mean(self.declines)
+        # self.declines = self.declines/np.std(self.declines)
         # self.declines = np.expand_dims(self.declines,axis=0) 
         
         # gains = []
@@ -367,9 +369,11 @@ class WiFi(Dataset):
         timestamp = [start,end]
         # amp = self.amps[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
         # amp = torch.from_numpy(amp).float()
+        # decline = self.declines[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
+        # decline = torch.from_numpy(decline).float()
         phase = self.phases[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
         phase = torch.from_numpy(phase).float()
-        # data = torch.concat((amp,phase),dim=0)
+        # data = torch.concat((decline,phase),dim=0)
         data = phase
         if self.gt is not None and self.gt_bin is not None:
             label2 = self.gt[int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f):24]
@@ -394,7 +398,9 @@ class MultiWiFi(Dataset):
         
 
 if __name__=='__main__':
-    # dataset = WiFi(data_file = '/server19/lmj/github/wifi_localization/data/20230918/room3/csi_2023_09_11_15_14.txt',
-    #                gt_file = '/server19/lmj/github/wifi_localization/data/20230918/room3-gt/csi_2023_09_11_15_14.txt')
-    dataset = WiFi(data_file = '/server19/lmj/github/wifi_localization/data/test/task2/room0/data/csi_2023_10_31_1.txt',plotting=True)
+    dataset = WiFi(data_file = '/server19/lmj/github/wifi_localization/data/case3/csi_2023_10_30_1.txt',
+                   gt_file='/server19/lmj/github/wifi_localization/data/case3/csi_2023_10_30_1_truth.txt',
+                   duration=295,
+                   _rssi=2,_gain=2,_H=250,_num_H=4,
+                   plotting=True)
     print(dataset[0])

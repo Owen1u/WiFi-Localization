@@ -1,8 +1,9 @@
-model_name: v3.5
+model_name: v5.1
+description: 增加rssi
 model_save_dir: /server19/lmj/github/wifi_localization/run
 seed: 2023
 
-epoch: 7
+epoch: 5
 lr_f: 0.0003
 lr_min: 0.0002
 multiplier: 1
