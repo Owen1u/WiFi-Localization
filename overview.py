@@ -3,18 +3,31 @@ Descripttion:
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-11-05 16:26:22
+LastEditTime: 2023-11-06 02:23:02
 '''
 import os
+import sys
 import glob
 import numpy as np
 from dataset.wifi import WiFi
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 
-results = open('/server19/lmj/github/wifi_localization/predict/1_office.txt','r')
+TASK = 'task2'
+
+results = open('/server19/lmj/github/wifi_localization/predict/2_office_42.txt','r')
 results = results.readlines()
-for test_file,pred in zip(sorted(glob.glob('lmj/github/wifi_localization/data/test/task1/*/data/*.txt')),results):
+sum0=0
+n_samples=0
+for res in results:
+    res = res.strip().split(' ')
+    res = np.array([int(r) for r in res])
+    n_samples+=res.shape[0]
+    sum0+=np.sum(res==0)
+
+print('标签0的占比：',sum0/float(n_samples))
+
+for test_file,pred in zip(sorted(glob.glob(os.path.join('lmj/github/wifi_localization/data/test',TASK,'*/data/*.txt'))),results):
     room = test_file.split('/')[6]
     print(test_file)
     basename = os.path.basename(test_file).split('.')[0]
@@ -31,6 +44,6 @@ for test_file,pred in zip(sorted(glob.glob('lmj/github/wifi_localization/data/te
     inter = np.linspace(0, data.duration, data.sampling_f * data.duration)
     pred = fc(inter)
     ax[0].plot(timestamps, pred, color='r',linestyle='-',label='prediction')
-    fig.savefig(os.path.join('/server19/lmj/github/wifi_localization/overviews',room+'_'+basename+'.jpg'))
+    fig.savefig(os.path.join(os.path.join('/server19/lmj/github/wifi_localization/overviews/',TASK,room+'_'+basename+'.jpg')))
     plt.close()
     

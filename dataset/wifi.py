@@ -3,7 +3,7 @@ Descripttion:
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-11-05 16:22:55
+LastEditTime: 2023-11-06 14:10:08
 '''
 import os
 import pywt
@@ -83,16 +83,19 @@ class WiFi(Dataset):
         self.data = sorted(self.data,key=lambda x:x.timestamp)
         
         self.amps = None
-        # amps = []
-        # for k in range(24,32,1):
-        #     amp = self.filt([i.amplitude[k] for i in self.data])
-        #     timestamps,amp = self.sampling([i.timestamp for i in self.data],amp,sampling_f,duration)
-        #     # amp_mean0 = self.bandpass(amp)
-        #     amp_mean0 = amp-np.mean(amp)
-        #     amp_mean0 = amp_mean0/np.max(amp_mean0)
-        #     amps.append(amp_mean0)
-        #     # self.amp = amp_mean0
-        # self.amps = np.stack(amps,axis=0)
+        amps = []
+        for k in range(subcarrier[0],subcarrier[1],1):
+            # amp = self.filt([i.amplitude[k] for i in self.data])
+            amp = [i.amplitude[k] for i in self.data]
+            timestamps,amp = self.sampling([i.timestamp for i in self.data],amp,sampling_f,duration)
+            amp = self.hampel(amp,7)
+            # amp_mean0 = self.bandpass(amp)
+            amp_mean0 = amp-np.mean(amp)
+            # amp_mean0 = amp_mean0/np.max(amp_mean0)
+            amp_mean0 = amp_mean0/np.std(amp_mean0)
+            amps.append(amp_mean0)
+            # self.amp = amp_mean0
+        self.amps = np.stack(amps,axis=0)
 
         self.phases = None
         phases = []
@@ -108,22 +111,15 @@ class WiFi(Dataset):
                         phase[i]+=2*np.pi
                 if phase[i]<0:
                     phase[i]+=2*np.pi
-                # if i>=1 and abs(phase[i]-phase[i-1])>0.1:
-                    # if phase[i]-phase[i-1] > 0.1:
-                    #     phase[i] = phase[i-1]+0.1
-                    # else:
-                    #     phase[i] = phase[i-1]-0.1
-                    # phase[i] = phase[i-1]
-                _phase.append(phase[i])
+                _phase.append(phase[i])                  
             phase = np.array(_phase)
             
-            phase = self.hampel(phase,11)
             # phase = signal.savgol_filter(phase,7,3)
             timestamps,phase = self.sampling([i.timestamp for i in self.data],phase,sampling_f,duration)
-            phase_mean0 = phase-np.mean(phase)
-            phase_mean0 = phase_mean0/np.std(phase_mean0)
-            # phase_mean0 = phase_mean0/max(np.max(phase_mean0),-1*np.min(phase_mean0))
-            phases.append(phase_mean0)
+            phase = self.hampel(phase,7)
+            phase = phase-np.mean(phase)
+            phase = phase/np.std(phase)
+            phases.append(phase)
         self.phases = np.stack(phases,axis=0)
         
         # self.draw_all_phase_diff([0,64,128,192])
@@ -280,7 +276,7 @@ class WiFi(Dataset):
             xmedian.append(medj)
         xmad = np.array(xmad)
         xmedian = np.array(xmedian)
-        scale = 1.4826  # 缩放
+        scale = 1.25  # 缩放
         xsigma = scale * xmad
         xi = ~(np.abs(X - xmedian) <= nsigma * xsigma)  # 找出离群点（即超过nsigma个标准差）
     
@@ -367,14 +363,14 @@ class WiFi(Dataset):
         start = int(index*self.stride)
         end = int(index*self.stride+self.window_size)
         timestamp = [start,end]
-        # amp = self.amps[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
-        # amp = torch.from_numpy(amp).float()
+        amp = self.amps[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
+        amp = torch.from_numpy(amp).float()
         # decline = self.declines[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
         # decline = torch.from_numpy(decline).float()
         phase = self.phases[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
         phase = torch.from_numpy(phase).float()
-        # data = torch.concat((decline,phase),dim=0)
-        data = phase
+        data = torch.concat((amp,phase),dim=0)
+        # data = phase
         if self.gt is not None and self.gt_bin is not None:
             label2 = self.gt[int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f):24]
             label1 = self.gt_bin[int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f):24]
@@ -398,9 +394,9 @@ class MultiWiFi(Dataset):
         
 
 if __name__=='__main__':
-    dataset = WiFi(data_file = '/server19/lmj/github/wifi_localization/data/case3/csi_2023_10_30_1.txt',
-                   gt_file='/server19/lmj/github/wifi_localization/data/case3/csi_2023_10_30_1_truth.txt',
-                   duration=295,
-                   _rssi=2,_gain=2,_H=250,_num_H=4,
+    dataset = WiFi(data_file = '/server19/lmj/github/wifi_localization/data/1020/train/signal/mid_4.txt',
+                #    gt_file='/server19/lmj/github/wifi_localization/data/case3/csi_2023_10_30_1_truth.txt',
+                   duration=300,phase_diff=[0,128],subcarrier=(8,16),
+                   _rssi=4,_gain=4,_H=64,_num_H=4,
                    plotting=True)
     print(dataset[0])

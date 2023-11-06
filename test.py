@@ -24,10 +24,10 @@ from utils.logger import Log
 from utils.meter import AverageMeter
 from utils.gradualwarmup import GradualWarmupScheduler
 
-answer = open('/server19/lmj/github/wifi_localization/predict/1_office_412.txt','w')
-TASK = 'task1'
-M=8+1
-Threshold = 0.8
+answer = open('/server19/lmj/github/wifi_localization/predict/2_office_44.txt','w')
+TASK = 'task2'
+M=6+1
+Threshold = 0.5
 R=2
 
 def set_seed(seed):
@@ -37,7 +37,7 @@ def set_seed(seed):
     
 cfg = Config('/server19/lmj/github/wifi_localization/config/config.yaml')
 config = cfg()
-config['model_name']='/server19/lmj/github/wifi_localization/run/v4.1'
+config['model_name']='/server19/lmj/github/wifi_localization/run/v4.4'
 set_seed(config['seed'])
 
 device = torch.device('cuda',0)
@@ -64,6 +64,7 @@ for room in range(0,4):
 
         test_data = WiFi(data_file=file_name,
                                     stride=2,
+                                    subcarrier=config['subcarrier'],
                                     window_size=config['window_size'])
 
         test_loader = DataLoader(test_data,
@@ -114,11 +115,11 @@ for room in range(0,4):
             predict_num = [round(i) for i in predict_num]
             predict_num = [round(np.mean(np.array(predict_num[i:i+R*2]))) for i in range(0,len(predict_num),R*2)]
 
-            for i in range(len(predict_man)):
-                if predict_man[i]==1 and predict_num[i]>=1:
-                    predict_man[i] = predict_num[i]
-            if 0 not in predict_man:
-                predict_man -= 1
+            # for i in range(len(predict_man)):
+            #     if predict_man[i]==1 and predict_num[i]>=1:
+            #         predict_man[i] = predict_num[i]
+            # if 0 not in predict_man:
+            #     predict_man -= 1
             print(predict_man)
             predict_man = [str(p) for p in predict_man]
             predict_man = ' '.join(predict_man)

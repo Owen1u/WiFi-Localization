@@ -1,9 +1,9 @@
-model_name: v5.1
-description: 增加rssi
+model_name: v4.4
+description: 采样频率=48,修改hampel位置，subcarrier=(8,16)
 model_save_dir: /server19/lmj/github/wifi_localization/run
 seed: 2023
 
-epoch: 5
+epoch: 7
 lr_f: 0.0003
 lr_min: 0.0002
 multiplier: 1
@@ -12,3 +12,4 @@ grad_clip: 5
 
 window_size: 128
 stride: 2
+subcarrier: [8,16]
