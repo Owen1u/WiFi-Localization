@@ -3,7 +3,7 @@ Descripttion:
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-11-06 14:10:08
+LastEditTime: 2023-11-08 04:09:19
 '''
 import os
 import pywt
@@ -52,15 +52,17 @@ class WiFi(Dataset):
     def __init__(self,data_file,gt_file=None,sampling_f=48,duration=300,buf=8,
                  window_size=72,stride=1,phase_diff=[0,64],plotting=False,
                  _time=3,_rssi=4,_mcs=1,_gain=4,_H=64,_num_H=4,
-                 subcarrier=(24,32)) -> None:
+                 subcarrier=(24,32),is_amp=True,is_phase_diff=True) -> None:
         super().__init__()
         
         self.sampling_f = sampling_f
         self.duration = duration
         self.window_size = window_size
         self.stride = stride
+        self.is_amp=is_amp
+        self.is_phase_diff = is_phase_diff
         if plotting:
-            self.fig, self.ax = plt.subplots(nrows=3,ncols=1,figsize=(18,18), facecolor='white')
+            self.fig, self.ax = plt.subplots(nrows=4,ncols=1,figsize=(18,24), facecolor='white')
             self.ax[0].set_title(os.path.basename(data_file))
         
         # fp = open('/server19/lmj/github/wifi_localization/data/20230918/1.txt','w+')
@@ -89,12 +91,9 @@ class WiFi(Dataset):
             amp = [i.amplitude[k] for i in self.data]
             timestamps,amp = self.sampling([i.timestamp for i in self.data],amp,sampling_f,duration)
             amp = self.hampel(amp,7)
-            # amp_mean0 = self.bandpass(amp)
-            amp_mean0 = amp-np.mean(amp)
-            # amp_mean0 = amp_mean0/np.max(amp_mean0)
-            amp_mean0 = amp_mean0/np.std(amp_mean0)
-            amps.append(amp_mean0)
-            # self.amp = amp_mean0
+            amp = amp-np.mean(amp)
+            amp = amp/np.std(amp)
+            amps.append(amp)
         self.amps = np.stack(amps,axis=0)
 
         self.phases = None
@@ -122,48 +121,38 @@ class WiFi(Dataset):
             phases.append(phase)
         self.phases = np.stack(phases,axis=0)
         
-        # self.draw_all_phase_diff([0,64,128,192])
+        self.mcs = None
+        # mcs=[i.mcs[0] for i in self.data]
+        # timestamps,mcs = self.sampling([i.timestamp for i in self.data],mcs,sampling_f,duration)
+        # mcs = mcs-np.mean(mcs)
+        # mcs = mcs/np.std(mcs)
+        # self.mcs = np.stack([mcs],axis=0)
         
-        # declines=[]
-        # for i in range(len(self.data)):
-        #     if abs(self.data[i].decline)<1000:
-        #         declines.append(self.data[i].decline)
-        #     else:
-        #         declines.append(self.data[0].decline)
-        # self.declines = np.array(declines)
-        # self.declines = self.hampel(self.declines,3)
-        # timestamps,self.declines  = self.sampling([i.timestamp for i in self.data],self.declines,sampling_f,duration)
-        # self.declines = self.declines-np.mean(self.declines)
-        # self.declines = self.declines/np.std(self.declines)
-        # self.declines = np.expand_dims(self.declines,axis=0) 
-        
-        # gains = []
-        # for k in range(59,60,1):
-        #     gain = np.array([i.gain[0] for i in self.data])
+        self.gains = None
+        # gains=[]
+        # for k in range(_gain):
+        #     gain = np.array([i.gain[k]-i.rssi[k] for i in self.data])
         #     timestamps,gain = self.sampling([i.timestamp for i in self.data],gain,sampling_f,duration)
-        #     gain_mean0 = gain-np.mean(gain)
-        #     gain_mean0 = gain_mean0/np.max(abs(gain_mean0))
-        #     gains.append(gain_mean0)
+        #     gain = gain-np.mean(gain)
+        #     gain = gain/np.std(gain)
+        #     gains.append(gain)
         # self.gains = np.stack(gains,axis=0)
-        
-        # rssis = []
-        # for k in range(59,60,1):
-        #     rssi = np.array([i.rssi[0] for i in self.data])
-        #     timestamps,rssi = self.sampling([i.timestamp for i in self.data],rssi,sampling_f,duration)
-        #     rssi_mean0 = rssi-np.mean(rssi)
-        #     rssi_mean0 = rssi_mean0/np.max(abs(rssi_mean0))
-        #     rssis.append(rssi_mean0)
-        # self.rssis = np.stack(rssis,axis=0)
+
         
         if plotting:
             if self.amps is not None:
                 self.ax[0].plot(timestamps, self.amps[-1], color='b',linestyle='-',label='amplitude')
             if self.phases is not None:
                 self.ax[1].plot(timestamps, self.phases[-1], color='b',linestyle='-',label='phase')
-            # self.ax[2].plot([i.timestamp for i in self.data], self.declines[-1], color='b',linestyle='-',label='decline')
-            self.ax[0].set_title('amplitude(high-pass)')
+            if self.mcs is not None:
+                self.ax[2].plot(timestamps, self.mcs[-1], color='b',linestyle='-',label='MCS')
+            if self.gains is not None:
+                self.ax[3].plot(timestamps, self.gain[-1], color='b',linestyle='-',label='gain')
+
+            self.ax[0].set_title('amplitude')
             self.ax[1].set_title('phase_diff')
-            self.ax[2].set_title('energy_decline')
+            self.ax[2].set_title('MCS')
+            self.ax[3].set_title('gain')
         
         self.gt_bin = self.gt = None
         
@@ -191,8 +180,8 @@ class WiFi(Dataset):
                 # self.ax.plot(inter, self.gt_wavelet, color='c',linestyle='-.',label='wavelet')
                 # self.ax.plot(inter, self.gt_gauss, color='g',linestyle='-.',label='gauss')
         if plotting:
-            plt.xlim(0,300)
-            plt.ylim(-1, 1)
+            # plt.xlim(0,300)
+            # plt.ylim(-1, 1)
             plt.xlabel('Time')
             plt.ylabel('Value')
             self.fig.legend(loc='upper right')
@@ -215,49 +204,6 @@ class WiFi(Dataset):
         print(l[5:],new_l[5:])
         return new_l
     
-    def draw_all_phase_diff(self,l:list):
-        count=0
-        for j1 in range(len(l)-1):
-            for j2 in range(j1+1,len(l)):
-                count+=1
-        fig, ax = plt.subplots(nrows=count,ncols=1,figsize=(24,24), facecolor='white')
-        count=0
-        for j1 in range(len(l)-1):
-            for j2 in range(j1+1,len(l)):
-                print(l[j1],l[j2])
-                phases = []
-                for k in range(15,16,1):
-                    p1 = np.array([i.phase[k+l[j1]] for i in self.data])
-                    p2 = np.array([i.phase[k+l[j2]] for i in self.data])
-                    phase = p1-p2
-                    # phase = np.array([i.phase[k+l[j1]]-i.phase[k+l[j2]] for i in self.data])
-                    # phase = self.filt([i.phase[k]-i.phase[k+phase_diff] for i in self.data])
-                    
-                    _phase=[phase[0]]
-                    for i in range(1,len(phase)):
-                        if phase[i] >PI:
-                            while phase[i]>PI:
-                                phase[i]-=2*PI
-                        elif phase[i] <= -PI:
-                            while phase[i] <= -PI:
-                                phase[i]+=2*PI
-                        if abs(phase[i]-phase[i-1])<=0.1:
-                            _phase.append(phase[i])
-                    phase = np.array(_phase)
-                    
-                    # phase = self.hampel(phase,11)
-                    # phase = signal.savgol_filter(phase,7,3)
-
-
-                    timestamps,phase = self.sampling([i.timestamp for i in self.data],phase,self.sampling_f,self.duration)
-                    # phase = self.bandpass(phase)
-                    phase_mean0 = phase-np.mean(phase)
-                    phase_mean0 = phase_mean0/max(np.max(phase_mean0),-1*np.min(phase_mean0))
-                    phases.append(phase_mean0)
-                ax[count].plot(timestamps, phases[-1], color='b',linestyle='-',label='phase')
-                ax[count].set_title('{0}-{1}'.format(l[j1],l[j2]))
-                count+=1
-        fig.savefig('phase.jpg')
                 
     def hampel(self,X,k):
         length = X.shape[0] - 1
@@ -339,18 +285,6 @@ class WiFi(Dataset):
         return timestamps,new_data
         
     def bandpass(self,x:np.ndarray):
-        # from kalman import Kalman_Filter
-        # A = 0.1
-        # H = 1
-        # Q = 0.5
-        # R = 0.5
-        # x[0]=0
-        # kf1 = Kalman_Filter(A, H, Q, R, x[np.newaxis,:].T)   # 不加反馈
-        # xb = 50
-        # Pb = 1
-        # x1 = kf1.get_filtered_data(xb, Pb)
-        # return x1
-
         b, a = signal.butter(8,0.05,'highpass')
         x_filter = signal.filtfilt(b,a,x)
         b, a = signal.butter(8,0.6,'lowpass')
@@ -363,14 +297,22 @@ class WiFi(Dataset):
         start = int(index*self.stride)
         end = int(index*self.stride+self.window_size)
         timestamp = [start,end]
-        amp = self.amps[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
-        amp = torch.from_numpy(amp).float()
+        data = []
+        if self.is_amp:
+            amp = self.amps[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
+            amp = torch.from_numpy(amp).float()
+            data.append(amp)
         # decline = self.declines[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
         # decline = torch.from_numpy(decline).float()
-        phase = self.phases[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
-        phase = torch.from_numpy(phase).float()
-        data = torch.concat((amp,phase),dim=0)
-        # data = phase
+        if self.is_phase_diff:
+            phase = self.phases[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
+            phase = torch.from_numpy(phase).float()
+            data.append(phase)
+        # mcs = self.mcs[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
+        # mcs = torch.from_numpy(mcs).float()
+        # gain = self.gains[:,int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f)]
+        # gain = torch.from_numpy(gain).float()
+        data = torch.concat(data,dim=0)
         if self.gt is not None and self.gt_bin is not None:
             label2 = self.gt[int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f):24]
             label1 = self.gt_bin[int(index*self.stride*self.sampling_f):int((index*self.stride+self.window_size)*self.sampling_f):24]
@@ -394,9 +336,9 @@ class MultiWiFi(Dataset):
         
 
 if __name__=='__main__':
-    dataset = WiFi(data_file = '/server19/lmj/github/wifi_localization/data/1020/train/signal/mid_4.txt',
-                #    gt_file='/server19/lmj/github/wifi_localization/data/case3/csi_2023_10_30_1_truth.txt',
-                   duration=300,phase_diff=[0,128],subcarrier=(8,16),
+    dataset = WiFi(data_file = '/server19/lmj/github/wifi_localization/data/test/task2-handle/signal/left_3.txt',
+                   gt_file='/server19/lmj/github/wifi_localization/data/test/task2-handle/gt/left_3.txt',
+                   duration=300,phase_diff=[0,64],subcarrier=(24,32),
                    _rssi=4,_gain=4,_H=64,_num_H=4,
                    plotting=True)
     print(dataset[0])

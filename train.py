@@ -3,7 +3,7 @@ Descripttion:
 version: 
 Contributor: Minjun Lu
 Source: Original
-LastEditTime: 2023-11-06 14:14:35
+LastEditTime: 2023-11-07 06:12:52
 '''
 '''
 Descripttion: 
@@ -74,24 +74,28 @@ for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/da
     data_file = gt_file.replace('gt','signal')
     dataset_list.append(WiFi(data_file=data_file,
                                 gt_file=gt_file,
+                                sampling_f = config['sampling_f'],
                                 stride=config['stride'],
                                 subcarrier=config['subcarrier'],
                                 window_size=config['window_size']))
-# for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/0909/gt','*.txt')):
-#     data_file = gt_file.replace('gt','signal')
-#     dataset_list.append(WiFi(data_file=data_file,
-#                                 gt_file=gt_file,
-#                                 stride=config['stride'],
-#                                 window_size=config['window_size']))
+for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1107/train/gt','*.txt')):
+    data_file = gt_file.replace('gt','signal')
+    dataset_list.append(WiFi(data_file=data_file,
+                            gt_file=gt_file,
+                            sampling_f = config['sampling_f'],
+                            stride=config['stride'],
+                            subcarrier=config['subcarrier'],
+                            window_size=config['window_size']))
 
 train_data = ConcatDataset(dataset_list)
 
 dataset_list = []
-for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1020/train/gt','*.txt')):
+for gt_file in glob.glob(os.path.join('/server19/lmj/github/wifi_localization/data/1107/train/gt','*.txt')):
     data_file = gt_file.replace('gt','signal')
     dataset_list.append(WiFi(data_file=data_file,
                                 gt_file=gt_file,
                                 stride=2,
+                                sampling_f = config['sampling_f'],
                                 subcarrier=config['subcarrier'],
                                 window_size=config['window_size']))
 test_data = ConcatDataset(dataset_list)
@@ -120,7 +124,7 @@ test_loader = DataLoader(test_data,
                          )
 
 device = torch.device('cuda',local_rank)
-model = Model().to(device)
+model = Model(in_channels=config['in_channels']).to(device)
 model=torch.nn.parallel.DistributedDataParallel(model,device_ids=[local_rank],find_unused_parameters =True,output_device=local_rank)
 
 filtered_parameters = []
