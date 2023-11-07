@@ -47,14 +47,6 @@ graph LR;
 
     MCS/Gains/RSSI -.-> interp1d_[interp1d_nearest];
     interp1d_ -.-> Data;
-
-    style Timestramp fill:green;
-    style CSI fill:green;
-    style MCS/Gains/RSSI fill:green;
-
-    style UnifiedTimestamp fill:purple;
-    style Data fill:purple;
-
 ```
 <!-- ```mermaid
 graph LR;
